@@ -17,7 +17,7 @@ class CorpusParser:
         wb = Workbook()
         worksheet = wb.active
         worksheet.title = "Document Structure"
-        worksheet.append(["Index", "Type", "Text", "Character Index", "Title Context","Title lvl2","Title lvl3"])
+        worksheet.append(["Filename","Index", "Type", "Text", "Character Index", "Title Context","Title lvl2","Title lvl3"])
         for file_path in self.file_path_list:
             new_document = (
                 DocumentParser(file_path, worksheet).parse_document()
@@ -44,7 +44,7 @@ class DocumentParser:
             source_stream = io.BytesIO(f.read())
             document = Document(source_stream)
             for i, paragraph in enumerate(document.paragraphs):
-                new_element = TextElement(i, paragraph, char_index,heading_context)
+                new_element = TextElement(self.filename, i, paragraph, char_index,heading_context)
                 heading_context = new_element.update_context()
                 new_element.parse()
                 char_index = new_element.update_cursor() 
@@ -59,13 +59,13 @@ class TextElement:
 
     def __init__(
             self, 
-            #document, 
+            filename, 
             index,
             paragraph,
             char_index,
             heading_context
         ):
-        #self.document = document
+        self.filename = filename
         self.index=index
         self.paragraph = paragraph
         self.text = self.paragraph.text.strip()
@@ -118,6 +118,7 @@ class TextElement:
             self.heading_level_3_context=self.heading_context[3]
         
     def __repr__(self):
+        print(f"Docx file: {self.filename}")
         print(f"Type: {self.text_type.capitalize()}, Index: {self.index}")
         print(f"Text: {self.text}")
         print(f"Character Index: {self.character_index}")
@@ -129,6 +130,7 @@ class TextElement:
     def save(self,worksheet):
         # Write structure data
         worksheet.append([
+            self.filename.stem,
             self.index,
             self.text_type,
             self.text,
