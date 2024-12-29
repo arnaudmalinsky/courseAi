@@ -1,0 +1,47 @@
+{
+    "name": "law_reference",
+    "strict": true,
+    "schema": {
+        "type": "object",
+        "properties": {
+            "flag_law": {
+                "type": "boolean",
+                "description": "True s'il y a une référence à un texte juridique dans l'entrée, sinon False"
+            },
+            "label": {
+                "type": "string",
+                "description": "Une courte annotation non structurée de la référence pour pouvoir l'identifier (ex:TC, 11 juillet 1933, Dame Mélinette) ."
+            },
+            "corpus": {
+                "type": "string",
+                "description": "le nom de l'ensemble de texte auquel est attaché la référence (ex: constitution, traité, code civil)"
+            },
+            "institution": {
+                "type": "string",
+                "description": "L'institution d'où provient le texte (ex: Court de justice europpéenne)"
+            },
+            "type": {
+                "type": "string",
+                "description": "Le type de texte auquel on fait référence (ex: 'Article', 'loi', 'arrêt', 'ordonnance', 'directive')."
+            },
+            "location": {
+                "type": "string",
+                "description": "L'emplacement du texte dans son corpus (ex: 'affaire 13/24', 'alinéa 3', 'article 16')."
+            },
+            "date": {
+                "type": "string",
+                "description": "La date où le texte est paru (ex:13/03/1998)."
+            }
+        },
+        "additionalProperties": false,
+        "required": [
+            "flag_law",
+            "label",
+            "corpus",
+            "institution",
+            "type",
+            "location",
+            "date"
+        ]
+    }
+}
