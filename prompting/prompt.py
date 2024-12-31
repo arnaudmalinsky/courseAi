@@ -1,5 +1,6 @@
 Prompt = """
 Tu es un assistant qui identifies des références de texte juridique dans une entrée ci-dessous en français. Ces références sont intégrées dans le texte sans ponctuation particulière (pas de guillemets par exemple). Pour chaque référence il faut produire un document au format json qui détaille les caractéristiques de cette référence à un article de loi.
+Attention ta réponse doit contenir seulement le json, aucun autre texte pour l'introduire.
 
 Il y a des entrées avec une référence et d'autre sans référence, s'il n'y a pas de référence de texte juridique dans l'entrée, il faut le signaler dans le json via l'attribut "flag_law" et laisser les autres attributs vides.
 
