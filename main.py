@@ -1,4 +1,7 @@
+import logging
+
 import typer
+
 from text_processing.parsers import CorpusParser
 from prompting.batch_llm_call import batch_call 
 
@@ -20,9 +23,15 @@ def batch_llm_call(
         open_ai_key: str,
         input_excel_file_path:str,
         output_excel_file_path: str,
-        batch_size:int  ,
-        limit:int         
+        batch_size:int=200,
+        limit:int=None,
+        verbose: bool = True 
     ):
+    lvl = logging.INFO
+    fmt = "%(message)s"
+    if verbose:
+        lvl = logging.DEBUG
+    logging.basicConfig(level=lvl, format=fmt)
     batch_call(
         open_ai_key,
         input_excel_file_path,

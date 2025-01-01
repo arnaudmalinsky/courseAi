@@ -5,6 +5,7 @@ import time
 from pathlib import Path
 import openpyxl
 from datetime import datetime
+import logging
 
 from openai import OpenAI
 import pandas as pd
@@ -17,6 +18,7 @@ from langchain.chains import LLMChain
 from .prompt import PROMPT
 
 HEADER_FORMAT= [
+    "unique_index",
     "Filename",
     "Index", 
     "Type", 
@@ -29,7 +31,7 @@ HEADER_FORMAT= [
     "label",
     "corpus",
     "institution",
-    "type",
+    "law_type",
     "location",
     "date"
     ]
@@ -37,13 +39,17 @@ HEADER_FORMAT= [
 class ExcelManager():
     def __init__(self, output_excel_file_path):
         self.output_excel_file_path = Path(output_excel_file_path)
-        self.flag_exists = self.output_excel_file_path.is_file()
+        self.flag_exists = self.get_flag_exists()
         self.workbook, self.worksheet=self._get_excel_workbook()
         self.beginning_index=self._get_beginning_index()
         self.inspect_or_create_header()
         self.new_excel_path = self._get_timestamp()
 
-
+    def get_flag_exists(self):
+        flag_exists = self.output_excel_file_path.is_file()
+        logging.info(f"File is found bool: {flag_exists}")
+        return flag_exists
+    
     def _get_timestamp(self):
         now = datetime.now()
         ts = datetime.timestamp(now)
@@ -53,34 +59,45 @@ class ExcelManager():
         return new_excel_path
 
     def _get_beginning_index(self):
-        return self.worksheet.max_row
+        logging.info(f"max row of existing file is {self.worksheet.max_row}")
+        beginning_index = self.worksheet.max_row - 1
+        logging.info(f"beginning index should be {beginning_index}")
+        return beginning_index
 
     def _get_excel_workbook(self):
         if self.flag_exists is True:
             wb = openpyxl.load_workbook(self.output_excel_file_path)
+            logging.info(f"Existing excel is loaded")
         else:
             wb = openpyxl.Workbook()
+            logging.info(f"New workbook is created")
         return wb, wb.active
     
     def inspect_or_create_header(self):
         values_list = list(self.worksheet.values)
         self.flag_header = True
-
+        print(values_list)
         if len(values_list)==0:
             self.flag_header = False
-        elif values_list[0] is HEADER_FORMAT:
-            self.flag_header = True
-        else:
+        elif list(values_list[0]) != HEADER_FORMAT: #[:len(HEADER_FORMAT)]
+            print(values_list[0])
+            print(HEADER_FORMAT)
             self.flag_header = False
 
         if self.flag_header is False:
+            logging.info(f"File format can't be used, new workbook is created")
             self.workbook = openpyxl.Workbook()
             self.worksheet = self.workbook.active
             self.worksheet.append(HEADER_FORMAT)
+            self.beginning_index=0
+        else:
+            logging.info(f"File format is correct, results will be stacked")
     
     def batch_append(self, batch_results_df):
         for idx, row in batch_results_df.iterrows():
-            self.worksheet.append(row.values())
+            self.worksheet.append(
+                row.to_list()
+            )
         self.workbook.save(self.new_excel_path)
 
 
@@ -89,7 +106,7 @@ class ResponseSchema(BaseModel):
     label: str
     corpus: str
     institution: str
-    type: str
+    law_type: str
     location: str
     date: str
 
@@ -117,7 +134,7 @@ def parse_response(response, parser):
             "label": "",
             "corpus": "",
             "institution": "",
-            "type": "",
+            "law_type": "",
             "location": "",
             "date": ""
         }
@@ -148,9 +165,10 @@ def format_and_merge_results(df, batch_results, idx_batch_beginning):
                     "label": "",
                     "corpus": "",
                     "institution": "",
-                    "type": "",
+                    "law_type": "",
                     "location": "",
-                    "date": ""
+                    "date": "",
+                    "unique_id":idx
                 }
             )
         else:
@@ -169,13 +187,16 @@ async def run_multiple_chains(chain,texts):
     results = await asyncio.gather(*tasks)
     return results
 
+def dummy_test(texts):
+    return [None for text in texts]
 
 def get_results(df, chain, batches, excel_output_object, batch_size):
     all_results = []
     idx=excel_output_object.beginning_index
     for batch in tqdm(batches):
-        loop = asyncio.get_event_loop()
-        batch_results = loop.run_until_complete(run_multiple_chains(chain, batch))
+        # loop = asyncio.get_event_loop()
+        # batch_results = asyncio.run(run_multiple_chains(chain, batch))
+        batch_results=dummy_test(batch)
         all_results.extend(batch_results)
         batch_results_df=format_and_merge_results(df, batch_results,idx)
         excel_output_object.batch_append(batch_results_df )
