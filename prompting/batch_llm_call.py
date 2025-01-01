@@ -14,7 +14,7 @@ from langchain.schema import OutputParserException
 from langchain.output_parsers import PydanticOutputParser
 from pydantic import BaseModel, ValidationError
 from langchain.chains import LLMChain
-from prompt import PROMPT
+from .prompt import PROMPT
 
 HEADER_FORMAT= [
     "Filename",
@@ -38,21 +38,22 @@ class ExcelManager():
     def __init__(self, output_excel_file_path):
         self.output_excel_file_path = Path(output_excel_file_path)
         self.flag_exists = self.output_excel_file_path.is_file()
-        self.workbook, self.worsksheet=self._get_excel_workbook()
-        self.inspect_or_create_header()
+        self.workbook, self.worksheet=self._get_excel_workbook()
         self.beginning_index=self._get_beginning_index()
+        self.inspect_or_create_header()
         self.new_excel_path = self._get_timestamp()
 
 
     def _get_timestamp(self):
         now = datetime.now()
         ts = datetime.timestamp(now)
-        self.new_excel_path=(
+        new_excel_path=(
             f"../courseai_data/llm_result_all_corpus_{str(ts)}.xlsx"
         )
+        return new_excel_path
 
     def _get_beginning_index(self):
-        return self.worsksheet.max_row
+        return self.worksheet.max_row
 
     def _get_excel_workbook(self):
         if self.flag_exists is True:
@@ -62,10 +63,20 @@ class ExcelManager():
         return wb, wb.active
     
     def inspect_or_create_header(self):
-        if any((self.worsksheet[0]!=HEADER_FORMAT)):
+        values_list = list(self.worksheet.values)
+        self.flag_header = True
+
+        if len(values_list)==0:
+            self.flag_header = False
+        elif values_list[0] is HEADER_FORMAT:
+            self.flag_header = True
+        else:
+            self.flag_header = False
+
+        if self.flag_header is False:
             self.workbook = openpyxl.Workbook()
-            self.worsksheet = self.workbook.active
-            self.worsksheet.append(HEADER_FORMAT)
+            self.worksheet = self.workbook.active
+            self.worksheet.append(HEADER_FORMAT)
     
     def batch_append(self, batch_results_df):
         for idx, row in batch_results_df.iterrows():
