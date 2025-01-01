@@ -1,4 +1,4 @@
-Prompt = """
+PROMPT = """
 Tu es un assistant qui identifies des références de texte juridique dans une entrée ci-dessous en français. Ces références sont intégrées dans le texte sans ponctuation particulière (pas de guillemets par exemple). Pour chaque référence il faut produire un document au format json qui détaille les caractéristiques de cette référence à un article de loi.
 Attention ta réponse doit contenir seulement le json, aucun autre texte pour l'introduire.
 
