@@ -87,12 +87,10 @@ class ExcelManager():
     def inspect_or_create_header(self):
         values_list = list(self.worksheet.values)
         self.flag_header = True
-        print(values_list)
         if len(values_list)==0:
             self.flag_header = False
         elif list(values_list[0]) != HEADER_FORMAT: #[:len(HEADER_FORMAT)]
-            print(values_list[0])
-            print(HEADER_FORMAT)
+
             self.flag_header = False
 
         if self.flag_header is False:
@@ -102,6 +100,8 @@ class ExcelManager():
             self.worksheet.append(HEADER_FORMAT)
             self.beginning_index=0
         else:
+            logging.warning("Header of excel is: %s",  values_list[0])
+            logging.warning("Last line values are: %s",  values_list[-1])
             logging.warning(f"File format is correct, results will be stacked")
     
     def batch_append(self, batch_results_df):
@@ -158,11 +158,14 @@ async def run_chain(chain, text, retries=2, delay=2):
             return result
         except Exception as e:
             if "rate_limit_exceeded" in str(e):
-                print(f"Rate limit hit for try {attempt}. Retrying in {delay} seconds... Error : {e}")
+                logging.warning(f"Rate limit hit for try {attempt}. Retrying in {delay} seconds... Error : {e}")
                 await asyncio.sleep(delay)
             else:
                 raise
-    print("Max retries reached. Skipping.")
+        except (ValidationError, OutputParserException) as e:
+            logging.warning(f"Error processing \n{e}")
+            return None
+    logging.warning("Max retries reached. Skipping.")
     return None
 
 def format_and_merge_results(df, batch_results, idx_batch_beginning):
