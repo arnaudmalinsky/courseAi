@@ -38,16 +38,27 @@ HEADER_FORMAT= [
 
 class ExcelManager():
     def __init__(self, output_excel_file_path):
-        self.output_excel_file_path = Path(output_excel_file_path)
+        self.output_excel_file_path = self.get_output_path(output_excel_file_path)
         self.flag_exists = self.get_flag_exists()
         self.workbook, self.worksheet=self._get_excel_workbook()
         self.beginning_index=self._get_beginning_index()
         self.inspect_or_create_header()
         self.new_excel_path = self._get_timestamp()
 
+    def get_output_path(self, output_excel_file_path):
+        try:
+            return Path(output_excel_file_path)
+        except TypeError as e:
+            logging.warning(f"No output path was given, error: {e}")
+            return None
+
     def get_flag_exists(self):
-        flag_exists = self.output_excel_file_path.is_file()
-        logging.info(f"File is found bool: {flag_exists}")
+        if self.output_excel_file_path:
+            flag_exists = self.output_excel_file_path.is_file()
+            logging.warning(f"File is found bool: {flag_exists}")
+        else:
+            logging.warning(f"No output excel path given")
+            flag_exists=False
         return flag_exists
     
     def _get_timestamp(self):
@@ -59,18 +70,18 @@ class ExcelManager():
         return new_excel_path
 
     def _get_beginning_index(self):
-        logging.info(f"max row of existing file is {self.worksheet.max_row}")
+        logging.warning(f"max row of existing file is {self.worksheet.max_row}")
         beginning_index = self.worksheet.max_row - 1
-        logging.info(f"beginning index should be {beginning_index}")
+        logging.warning(f"beginning index should be {beginning_index}")
         return beginning_index
 
     def _get_excel_workbook(self):
         if self.flag_exists is True:
             wb = openpyxl.load_workbook(self.output_excel_file_path)
-            logging.info(f"Existing excel is loaded")
+            logging.warning(f"Existing excel is loaded")
         else:
             wb = openpyxl.Workbook()
-            logging.info(f"New workbook is created")
+            logging.warning(f"New workbook is created")
         return wb, wb.active
     
     def inspect_or_create_header(self):
@@ -85,13 +96,13 @@ class ExcelManager():
             self.flag_header = False
 
         if self.flag_header is False:
-            logging.info(f"File format can't be used, new workbook is created")
+            logging.warning(f"File format can't be used, new workbook is created")
             self.workbook = openpyxl.Workbook()
             self.worksheet = self.workbook.active
             self.worksheet.append(HEADER_FORMAT)
             self.beginning_index=0
         else:
-            logging.info(f"File format is correct, results will be stacked")
+            logging.warning(f"File format is correct, results will be stacked")
     
     def batch_append(self, batch_results_df):
         for idx, row in batch_results_df.iterrows():
@@ -195,8 +206,8 @@ def get_results(df, chain, batches, excel_output_object, batch_size):
     idx=excel_output_object.beginning_index
     for batch in tqdm(batches):
         # loop = asyncio.get_event_loop()
-        # batch_results = asyncio.run(run_multiple_chains(chain, batch))
-        batch_results=dummy_test(batch)
+        batch_results = asyncio.run(run_multiple_chains(chain, batch))
+        # batch_results=dummy_test(batch)
         all_results.extend(batch_results)
         batch_results_df=format_and_merge_results(df, batch_results,idx)
         excel_output_object.batch_append(batch_results_df )

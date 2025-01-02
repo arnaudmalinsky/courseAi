@@ -22,14 +22,14 @@ def process_documents(
 def batch_llm_call(
         open_ai_key: str,
         input_excel_file_path:str,
-        output_excel_file_path: str,
+        output_excel_file_path: str=None,
         batch_size:int=200,
         limit:int=None,
         verbose: bool = True 
     ):
-    lvl = logging.INFO
+    lvl = logging.WARNING
     fmt = "%(message)s"
-    if verbose:
+    if verbose is True:
         lvl = logging.DEBUG
     logging.basicConfig(level=lvl, format=fmt)
     batch_call(
