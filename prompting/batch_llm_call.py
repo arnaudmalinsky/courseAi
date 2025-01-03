@@ -7,7 +7,8 @@ import openpyxl
 from datetime import datetime
 import logging
 
-from openai import OpenAI
+import openai
+from openai import OpenAI, OpenAIError
 import pandas as pd
 from langchain_openai import ChatOpenAI
 from langchain.prompts import PromptTemplate
@@ -134,34 +135,15 @@ def get_chain(instruction, llm, parser):
     # chain = LLMChain(llm=llm, prompt=prompt)
     return chain
 
-# Asynchronous function to process a single response
-def parse_response(response, parser):
-    try:
-        response_dict = parser.invoke(response).dict()
-    except (ValidationError, OutputParserException) as e:
-        print(f"Error processing \n{e}")
-        response_dict = {
-            "flag_law": "",
-            "label": "",
-            "corpus": "",
-            "institution": "",
-            "law_type": "",
-            "location": "",
-            "date": ""
-        }
-    return response_dict
 
 async def run_chain(chain, text, retries=2, delay=2):
     for attempt in range(retries):
         try:
             result = await chain.ainvoke({'query': text})
             return result
-        except Exception as e:
-            if "rate_limit_exceeded" in str(e):
-                logging.warning(f"Rate limit hit for try {attempt}. Retrying in {delay} seconds... Error : {e}")
-                await asyncio.sleep(delay)
-            else:
-                raise
+        except OpenAIError as e:
+            logging.warning(f"Rate limit hit for try {attempt}. Retrying in {delay} seconds... Error : {e}")
+            await asyncio.sleep(delay)
         except (ValidationError, OutputParserException) as e:
             logging.warning(f"Error processing \n{e}")
             return None
