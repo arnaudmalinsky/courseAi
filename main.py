@@ -11,11 +11,20 @@ app = typer.Typer()
 @app.command()
 def process_documents(
         input_files_folder_path: str,
-        output_excel_file_path:str
+        output_excel_file_path:str,
+        max_length:int,
+        verbose: bool = True 
     ):
+    lvl = logging.WARNING
+    fmt = "%(message)s"
+    if verbose is True:
+        lvl = logging.DEBUG
+    logging.basicConfig(level=lvl, format=fmt)
+    
     CorpusParser(
         input_files_folder_path,
-        output_excel_file_path
+        output_excel_file_path,
+        max_length
     ).parse_all_documents()
 
 @app.command()
