@@ -14,13 +14,14 @@ class CorpusParser:
         self.max_length=max_length
 
     def get_file_path(self):
-        self.file_path_list = list(self.folder_path.glob('**/*.docx'))
+        # self.file_path_list = list(self.folder_path.glob('**/*.docx'))
+        self.file_path_list = list(self.folder_path.glob('*.docx'))
 
     def parse_all_documents(self):
         wb = Workbook()
         worksheet = wb.active
         worksheet.title = "Document Structure"
-        worksheet.append(["Filename","Index", "Type", "Text", "Character Index", "Title Context","Title lvl2","Title lvl3"])
+        worksheet.append(["Folder","Filename","Index", "Type", "Text", "Character Index", "Title Context","Title lvl2","Title lvl3"])
         for file_path in self.file_path_list:
             new_document = (
                 DocumentParser(file_path, worksheet,self.max_length).parse_document()
@@ -155,6 +156,7 @@ class ParagraphElement:
     def save(self):
         # Write structure data
         self.worksheet.append([
+            str(self.filename.parents[0]),
             self.filename.stem,
             self.index,
             self.text_type,

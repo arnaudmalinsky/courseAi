@@ -16,7 +16,8 @@ from langchain.schema import OutputParserException
 from langchain.output_parsers import PydanticOutputParser
 from pydantic import BaseModel, ValidationError
 from langchain.chains import LLMChain
-from .prompt import PROMPT
+
+from .law_reference_identification_prompt import PROMPT
 
 HEADER_FORMAT= [
     "unique_index",
