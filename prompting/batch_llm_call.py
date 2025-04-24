@@ -17,29 +17,19 @@ from langchain.output_parsers import PydanticOutputParser
 from pydantic import BaseModel, ValidationError
 from langchain.chains import LLMChain
 
-from .law_reference_identification_prompt import PROMPT
+from .law_reference_identification_prompt import (
+    LAW_REF_PROMPT,LAW_REF_HEADER_FORMAT
+)
+from .sumup_prompt import (
+    SUMUP_PROMPT,
+    SUMUP_HEADER_FORMAT
+)
 
-HEADER_FORMAT= [
-    "unique_index",
-    "Filename",
-    "Index", 
-    "Type", 
-    "Text", 
-    "Character Index", 
-    "Title Context",
-    "Title lvl2",
-    "Title lvl3",
-    "flag_law",
-    "label",
-    "corpus",
-    "institution",
-    "law_type",
-    "location",
-    "date"
-    ]
+
 
 class ExcelManager():
-    def __init__(self, output_excel_file_path):
+    def __init__(self, output_excel_file_path, header_format):
+        self.header_format=header_format
         self.output_excel_file_path = self.get_output_path(output_excel_file_path)
         self.flag_exists = self.get_flag_exists()
         self.workbook, self.worksheet=self._get_excel_workbook()
@@ -91,7 +81,7 @@ class ExcelManager():
         self.flag_header = True
         if len(values_list)==0:
             self.flag_header = False
-        elif list(values_list[0]) != HEADER_FORMAT: #[:len(HEADER_FORMAT)]
+        elif list(values_list[0]) != self.header_format: #[:len(self.header_format)]
 
             self.flag_header = False
 
@@ -99,7 +89,7 @@ class ExcelManager():
             logging.warning(f"File format can't be used, new workbook is created")
             self.workbook = openpyxl.Workbook()
             self.worksheet = self.workbook.active
-            self.worksheet.append(HEADER_FORMAT)
+            self.worksheet.append(self.header_format)
             self.beginning_index=0
         else:
             logging.warning("Header of excel is: %s",  values_list[0])
@@ -114,7 +104,7 @@ class ExcelManager():
         self.workbook.save(self.new_excel_path)
 
 
-class ResponseSchema(BaseModel):
+class LawRefResponseSchema(BaseModel):
     flag_law: bool
     label: str
     corpus: str
@@ -123,16 +113,33 @@ class ResponseSchema(BaseModel):
     location: str
     date: str
 
+class SumUpResponseSchema(BaseModel):
+    text_sumup: str
+
 def get_chain(instruction, llm, parser):
     
 
     prompt = PromptTemplate(
-        template=instruction + "\n{format_instructions}\n{query}\n",
+        template=(
+            instruction + 
+            "\n Instructions de format : {format_instructions}"+
+            "\n Le texte à analyser : {query}\n"
+        ),
         input_variables=["query"],
         partial_variables={"format_instructions": parser.get_format_instructions()},
     )
 
     chain = prompt | llm | parser
+    # chain = LLMChain(llm=llm, prompt=prompt)
+    return chain
+
+def get_sumup_chain(instruction, llm):
+    prompt = PromptTemplate(
+        template=(instruction + "{query}"),
+        input_variables=["query"],
+    )
+
+    chain = prompt | llm
     # chain = LLMChain(llm=llm, prompt=prompt)
     return chain
 
@@ -187,13 +194,18 @@ async def run_multiple_chains(chain,texts):
 def dummy_test(texts):
     return [None for text in texts]
 
-def get_results(df, chain, batches, excel_output_object, batch_size):
+def get_results(
+        df, 
+        chain, 
+        batches, 
+        excel_output_object, 
+        batch_size
+    ):
+
     all_results = []
     idx=excel_output_object.beginning_index
     for batch in tqdm(batches):
-        # loop = asyncio.get_event_loop()
         batch_results = asyncio.run(run_multiple_chains(chain, batch))
-        # batch_results=dummy_test(batch)
         all_results.extend(batch_results)
         batch_results_df=format_and_merge_results(df, batch_results,idx)
         excel_output_object.batch_append(batch_results_df )
@@ -201,8 +213,8 @@ def get_results(df, chain, batches, excel_output_object, batch_size):
         idx+=batch_size
     return all_results
 
-def get_batches(df, batch_size):
-    return [df['Text'][i:i + batch_size].fillna("").tolist() for i in range(0, len(df), batch_size)]
+def get_batches(df, batch_size, text_column="Text"):
+    return [df[text_column][i:i + batch_size].fillna("").tolist() for i in range(0, len(df), batch_size)]
 
 def get_formatted_data(input_excel_file_path,excel_output_object, limit):
     sample_df = pd.read_excel(input_excel_file_path)
@@ -219,26 +231,50 @@ def get_formatted_data(input_excel_file_path,excel_output_object, limit):
 
 
 # Function to process a DataFrame using the LLM
-def batch_call(open_ai_key,input_excel_file_path,output_excel_file_path, batch_size = 500, limit=None):
-    instruction =PROMPT
-    excel_output_object = ExcelManager(output_excel_file_path)
+def batch_call(
+        open_ai_key,
+        input_excel_file_path,
+        output_excel_file_path, 
+        flag_law_ref,
+        batch_size = 500, 
+        limit=None
+    ):
+    
+    
     llm = ChatOpenAI(
         model_name="gpt-4o-mini",
         openai_api_key = open_ai_key,
         temperature = 0
     )
-    df = get_formatted_data(input_excel_file_path, excel_output_object,limit)
+
     # Ensure the DataFrame has a 'text' column
-    if 'Text' not in df.columns:
-        raise ValueError("DataFrame must contain a 'text' column")
-
-
-    batches_list = get_batches(df, batch_size)
-    parser = PydanticOutputParser(pydantic_object=ResponseSchema)
     
-    chain=get_chain(instruction, llm, parser)
 
-    #results_list =asyncio.run(get_results(chain, batches, parser))
-    results_list = get_results(df,chain, batches_list, excel_output_object, batch_size)
+    if flag_law_ref:
+        excel_output_object = ExcelManager(output_excel_file_path, LAW_REF_HEADER_FORMAT)
+        df = get_formatted_data(input_excel_file_path, excel_output_object,limit)
+        if 'Text' not in df.columns:
+            raise ValueError("DataFrame must contain a 'text' column")
+        instruction =LAW_REF_PROMPT
+        batches_list = get_batches(df, batch_size, 'Text')
+        parser = PydanticOutputParser(pydantic_object=LawRefResponseSchema)
+        chain=get_chain(instruction, llm, parser)
+    else:
+        excel_output_object = ExcelManager(output_excel_file_path, SUMUP_HEADER_FORMAT)
+        df = get_formatted_data(input_excel_file_path, excel_output_object,limit)
+        if 'concat_texts' not in df.columns:
+            raise ValueError("DataFrame must contain a 'concat_texts' column")
+        instruction =SUMUP_PROMPT
+        batches_list = get_batches(df, batch_size, 'concat_texts')
+        parser = PydanticOutputParser(pydantic_object=SumUpResponseSchema)
+        chain=get_chain(instruction, llm, parser)
+
+    results_list = get_results(
+        df,
+        chain, 
+        batches_list, 
+        excel_output_object, 
+        batch_size
+    )
 
     return results_list

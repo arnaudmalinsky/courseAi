@@ -7,11 +7,12 @@ from openpyxl import Workbook
 from langchain.text_splitter import RecursiveCharacterTextSplitter
 
 class CorpusParser:
-    def __init__(self,folder_path, output_path, max_length):
+    def __init__(self,folder_path, output_path, max_length, overlap):
         self.folder_path = Path(folder_path)
         self.get_file_path()
         self.output_path=output_path
         self.max_length=max_length
+        self.overlap=overlap
 
     def get_file_path(self):
         # self.file_path_list = list(self.folder_path.glob('**/*.docx'))
@@ -24,7 +25,7 @@ class CorpusParser:
         worksheet.append(["Folder","Filename","Index", "Type", "Text", "Character Index", "Title Context","Title lvl2","Title lvl3"])
         for file_path in self.file_path_list:
             new_document = (
-                DocumentParser(file_path, worksheet,self.max_length).parse_document()
+                DocumentParser(file_path, worksheet,self.max_length, self.overlap).parse_document()
             )
         wb.save(self.output_path)
 
@@ -34,10 +35,11 @@ class DocumentParser:
     Could be used to store 'structure' from docx package
     """
 
-    def __init__(self, filename, worksheet,max_length):
+    def __init__(self, filename, worksheet,max_length,overlap):
         self.filename = filename
         self.worksheet=worksheet
         self.max_lenght=max_length
+        self.overlap=overlap
         
         
         
@@ -49,7 +51,16 @@ class DocumentParser:
             source_stream = io.BytesIO(f.read())
             document = Document(source_stream)
             for i, paragraph in enumerate(document.paragraphs):
-                new_paragraph = ParagraphElement(self.filename, i, paragraph, char_index,heading_context, self.max_lenght, self.worksheet)
+                new_paragraph = ParagraphElement(
+                    self.filename, 
+                    i, 
+                    paragraph, 
+                    char_index,
+                    heading_context, 
+                    self.max_lenght, 
+                    self.overlap,
+                    self.worksheet
+                )
                 heading_context = new_paragraph.update_context()
                 new_paragraph.parse_and_save()
                 char_index=new_paragraph.get_char_index()
@@ -70,10 +81,12 @@ class ParagraphElement:
             char_index,
             heading_context,
             max_length,
+            overlap,
             worksheet
         ):
         self.worksheet=worksheet
         self.max_lenght=max_length
+        self.overlap=overlap
         self.heading_level_1_context=""
         self.heading_level_2_context=""
         self.heading_level_3_context=""
@@ -114,12 +127,7 @@ class ParagraphElement:
     
     @staticmethod
     def _breakdown_paragraph(text, max_length=600, overlap=0):
-        # paragraphs = []
-        # while len(text) > max_length:
-            # split_point = max_length - overlap
-            # paragraphs.append(text[:split_point].strip())
-            # text = text[split_point:].strip()
-        # paragraphs.append(text)
+
         logging.warning(f"input is too long compared to max_length: {max_length}")
 
         splitter = RecursiveCharacterTextSplitter(
@@ -131,9 +139,33 @@ class ParagraphElement:
         chunks = splitter.split_text(text)
             
         return chunks
+    
+    def get_markdown_text(self):
+        md_text = ""
+        for run in self.paragraph.runs:
+            text = run.text
+            if not text.strip():
+                continue  # ignorer les textes vides
+
+            # Appliquer le style Markdown selon les propriétés
+            if run.bold:
+                text = f"**{text}**"
+            if run.italic:
+                text = f"*{text}*"
+            if run.underline:
+                text = f"__{text}__"
+
+            md_text += text
+        return md_text
 
     def parse_and_save(self):
-        sub_paragraphs = self._breakdown_paragraph(self.text, max_length=self.max_lenght)
+        
+        markdown_text = self.get_markdown_text()
+        sub_paragraphs = self._breakdown_paragraph(
+            markdown_text, 
+            max_length=self.max_lenght,
+            overlap=self.overlap
+        )
         for sub_paragraph in sub_paragraphs:
             self.text=sub_paragraph
             self.character_index=self.character_index
