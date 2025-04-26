@@ -39,10 +39,20 @@ def edit_sumup(
     law_ref_df = pd.read_excel(law_ref_excel_path)
 
     merged_df = law_ref_df.merge(
-        texts_df[["unique_index","Filename","Index","text_sumup"]],
-        on=["unique_index","Filename", "Index"], 
+        texts_df[[
+            # "Folder",
+            "Filename",
+            "Index",
+            "text_sumup"
+            ]],
+        on=[
+            # "Folder",
+            "Filename", 
+            "Index"], 
         how='left'
         )
+    merged_df["Index"] = merged_df["Filename","Index"].astype(int)
+    merged_df=merged_df.sort_values(by="Index", ascending=True)
 
     # Filter out rows where flag_law is not True
     # merged_df = merged_df[merged_df['flag_law'] == True]
@@ -55,14 +65,14 @@ def edit_sumup(
     doc.add_heading(course_name, level=0)
 
     # Sort to ensure correct agenda order
-    merged_df.sort_values(by=['Title Context', 'Title lvl2', 'Title lvl3'], inplace=True)
+    # merged_df.sort_values(by=['Title Context', 'Title lvl2', 'Title lvl3'], inplace=True)
 
     # Track previous levels to avoid repetition
     prev_lvl1 = ""
     prev_lvl2 = ""
 
     # Group by agenda levels
-    grouped = merged_df.groupby(['Title Context', 'Title lvl2', 'Title lvl3'])
+    grouped = merged_df.groupby(['Title Context', 'Title lvl2', 'Title lvl3'] , sort=False)
     for (lvl1, lvl2, lvl3), group in grouped:
         if lvl1 != prev_lvl1:
             doc.add_heading(str(lvl1), level=1)
@@ -108,12 +118,12 @@ def edit_sumup(
                     p = add_markdown_paragraph(doc, clean_text, bullet_prefix="- ")
                     p.paragraph_format.left_indent = Pt(20)
 
-                    doc.add_paragraph("Articles juridiques trouvés :")
-                    for _, row in group.iterrows():
-                        if row["flag_law"]==True:
-                            law_text = f"• {row['label']}, description : {row['law_description']}"# ({row['law_type']}, {row['institution']}, {row['corpus']}, {row['location']}, {row['date'] if pd.notna(row['date']) else 'No Date'})"
-                            para = doc.add_paragraph(law_text)
-                            para.style.font.size = Pt(10)
+        doc.add_paragraph("Articles juridiques trouvés :")
+        for _, row in group.iterrows():
+            if row["flag_law"]==True:
+                law_text = f"• {row['label']}, description : {row['law_description']}"# ({row['law_type']}, {row['institution']}, {row['corpus']}, {row['location']}, {row['date'] if pd.notna(row['date']) else 'No Date'})"
+                para = doc.add_paragraph(law_text)
+                para.style.font.size = Pt(10)
 
     # Save the document
     # Example

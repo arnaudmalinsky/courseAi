@@ -1,5 +1,5 @@
 LAW_REF_HEADER_FORMAT= [
-    "unique_index",
+    # "unique_index",
     "Filename",
     "Index", 
     "Type", 

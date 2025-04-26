@@ -210,7 +210,7 @@ def get_results(
         all_results.extend(batch_results)
         batch_results_df=format_and_merge_results(df, batch_results,idx,parser_class)
         excel_output_object.batch_append(batch_results_df )
-        time.sleep(2)
+        # time.sleep(2)
         idx+=batch_size
     return all_results
 
