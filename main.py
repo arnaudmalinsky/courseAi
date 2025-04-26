@@ -4,6 +4,8 @@ import typer
 
 from text_processing.parsers import CorpusParser
 from prompting.batch_llm_call import batch_call 
+from text_processing.edit_sumup import edit_sumup
+from text_processing.concatenate_texts import concatenate_text_from_excel
 
 
 app = typer.Typer()
@@ -53,6 +55,40 @@ def batch_llm_call(
         limit 
     )
 
+@app.command()
+def edit_sumup_doc(
+    sumup_excel_path:str,
+    law_ref_excel_path:str,
+    course_name:str,
+    verbose: bool = True 
+):
+    lvl = logging.WARNING
+    fmt = "%(message)s"
+    if verbose is True:
+        lvl = logging.DEBUG
+    logging.basicConfig(level=lvl, format=fmt)
+    edit_sumup(
+        sumup_excel_path,
+        law_ref_excel_path,
+        course_name,
+    )
+
+@app.command()
+def concatenate_excel_text(
+    all_excel_file_path,
+    course_name,
+    verbose: bool = True 
+):
+    lvl = logging.WARNING
+    fmt = "%(message)s"
+    if verbose is True:
+        lvl = logging.DEBUG
+    logging.basicConfig(level=lvl, format=fmt)
+    concatenate_text_from_excel(
+        all_excel_file_path,
+        course_name,
+    )
+    
 
 if __name__ == "__main__":
     app()

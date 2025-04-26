@@ -97,16 +97,20 @@ class ExcelManager():
             logging.warning(f"File format is correct, results will be stacked")
     
     def batch_append(self, batch_results_df):
+        # for idx, row in batch_results_df.iterrows():
+        #     self.worksheet.append(
+        #         row.to_list()
+        #     )
         for idx, row in batch_results_df.iterrows():
-            self.worksheet.append(
-                row.to_list()
-            )
+            row_data = [row[col] for col in self.header_format]  # Only take the columns in the expected header order
+            self.worksheet.append(row_data)
         self.workbook.save(self.new_excel_path)
 
 
 class LawRefResponseSchema(BaseModel):
     flag_law: bool
     label: str
+    law_description:str
     corpus: str
     institution: str
     law_type: str
@@ -145,6 +149,9 @@ def get_sumup_chain(instruction, llm):
 
 
 async def run_chain(chain, text, retries=2, delay=2):
+    if len(text) < 100:
+        logging.info("Skipping short text (less than 100 characters).")
+        return None
     for attempt in range(retries):
         try:
             result = await chain.ainvoke({'query': text})
@@ -158,22 +165,15 @@ async def run_chain(chain, text, retries=2, delay=2):
     logging.warning("Max retries reached. Skipping.")
     return None
 
-def format_and_merge_results(df, batch_results, idx_batch_beginning):
+def format_and_merge_results(df, batch_results, idx_batch_beginning, parser_class):
+    default_dict = {field: None for field in parser_class.model_fields}
     result_dict_list = []
     idx = idx_batch_beginning
     for result in batch_results:
         if result is None:
+            default_dict["unique_id"]=idx
             result_dict_list.append(
-                {
-                    "flag_law": "",
-                    "label": "",
-                    "corpus": "",
-                    "institution": "",
-                    "law_type": "",
-                    "location": "",
-                    "date": "",
-                    "unique_id":idx
-                }
+                default_dict
             )
         else:
             result_dict=result.dict()
@@ -199,7 +199,8 @@ def get_results(
         chain, 
         batches, 
         excel_output_object, 
-        batch_size
+        batch_size,
+        parser_class
     ):
 
     all_results = []
@@ -207,7 +208,7 @@ def get_results(
     for batch in tqdm(batches):
         batch_results = asyncio.run(run_multiple_chains(chain, batch))
         all_results.extend(batch_results)
-        batch_results_df=format_and_merge_results(df, batch_results,idx)
+        batch_results_df=format_and_merge_results(df, batch_results,idx,parser_class)
         excel_output_object.batch_append(batch_results_df )
         time.sleep(2)
         idx+=batch_size
@@ -242,7 +243,7 @@ def batch_call(
     
     
     llm = ChatOpenAI(
-        model_name="gpt-4o-mini",
+        model_name="gpt-4o",#-mini
         openai_api_key = open_ai_key,
         temperature = 0
     )
@@ -259,6 +260,14 @@ def batch_call(
         batches_list = get_batches(df, batch_size, 'Text')
         parser = PydanticOutputParser(pydantic_object=LawRefResponseSchema)
         chain=get_chain(instruction, llm, parser)
+        results_list = get_results(
+            df,
+            chain, 
+            batches_list, 
+            excel_output_object, 
+            batch_size,
+            LawRefResponseSchema
+        )
     else:
         excel_output_object = ExcelManager(output_excel_file_path, SUMUP_HEADER_FORMAT)
         df = get_formatted_data(input_excel_file_path, excel_output_object,limit)
@@ -269,12 +278,13 @@ def batch_call(
         parser = PydanticOutputParser(pydantic_object=SumUpResponseSchema)
         chain=get_chain(instruction, llm, parser)
 
-    results_list = get_results(
-        df,
-        chain, 
-        batches_list, 
-        excel_output_object, 
-        batch_size
-    )
+        results_list = get_results(
+            df,
+            chain, 
+            batches_list, 
+            excel_output_object, 
+            batch_size,
+            SumUpResponseSchema
+        )
 
     return results_list
