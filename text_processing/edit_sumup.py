@@ -51,8 +51,8 @@ def edit_sumup(
             "Index"], 
         how='left'
         )
-    merged_df["Index"] = merged_df["Filename","Index"].astype(int)
-    merged_df=merged_df.sort_values(by="Index", ascending=True)
+    merged_df["Index"] = merged_df["Index"].astype(int)
+    merged_df=merged_df.sort_values(by=["Filename","Index"], ascending=True)
 
     # Filter out rows where flag_law is not True
     # merged_df = merged_df[merged_df['flag_law'] == True]
@@ -61,78 +61,80 @@ def edit_sumup(
     merged_df.fillna('', inplace=True)
 
     # Create Word document
-    doc = Document()
-    doc.add_heading(course_name, level=0)
+    for filename in list(merged_df.Filename.unique()):
+        filtered_df = merged_df[merged_df["Filename"]==filename]
+        doc = Document()
+        doc.add_heading(filename, level=0)
 
-    # Sort to ensure correct agenda order
-    # merged_df.sort_values(by=['Title Context', 'Title lvl2', 'Title lvl3'], inplace=True)
+        # Sort to ensure correct agenda order
+        # merged_df.sort_values(by=['Title Context', 'Title lvl2', 'Title lvl3'], inplace=True)
 
-    # Track previous levels to avoid repetition
-    prev_lvl1 = ""
-    prev_lvl2 = ""
+        # Track previous levels to avoid repetition
+        prev_lvl1 = ""
+        prev_lvl2 = ""
 
-    # Group by agenda levels
-    grouped = merged_df.groupby(['Title Context', 'Title lvl2', 'Title lvl3'] , sort=False)
-    for (lvl1, lvl2, lvl3), group in grouped:
-        if lvl1 != prev_lvl1:
-            doc.add_heading(str(lvl1), level=1)
-            prev_lvl1 = lvl1
-            prev_lvl2 = "" 
-        if lvl2 != prev_lvl2:
-            doc.add_heading(str(lvl2), level=2)
-            prev_lvl2 = lvl2
+        # Group by agenda levels
+        grouped = filtered_df.groupby(['Title Context', 'Title lvl2', 'Title lvl3'] , sort=False)
+        for (lvl1, lvl2, lvl3), group in grouped:
+            if lvl1 != prev_lvl1:
+                doc.add_heading(str(lvl1), level=1)
+                prev_lvl1 = lvl1
+                prev_lvl2 = "" 
+            if lvl2 != prev_lvl2:
+                doc.add_heading(str(lvl2), level=2)
+                prev_lvl2 = lvl2
 
-        doc.add_heading(str(lvl3), level=3)
+            doc.add_heading(str(lvl3), level=3)
 
-        first_sumup = group.iloc[0]['text_sumup']
+            first_sumup = group.iloc[0]['text_sumup']
 
-        if len(first_sumup)!=0:
-            print(first_sumup)
-            
-            
-        # Split the input text into lines
-            lines = first_sumup.splitlines()
-
-            # Process each line
-            for line in lines:
-                leading_spaces = len(line) - len(line.lstrip(' '))
+            if len(first_sumup)!=0:
+                # print(first_sumup)
                 
-                clean_text = line.strip()
-                has_bullet = clean_text.startswith("- ")
-                if has_bullet:
-                    clean_text = clean_text[2:]  # Remove the "-" for parsing, we add it separately
+                
+            # Split the input text into lines
+                lines = first_sumup.splitlines()
 
-                # Determine indentation and bullet prefix
-                if leading_spaces == 0:
-                    # Top-level headline
-                    p = add_markdown_paragraph(doc, clean_text)  # no bullet
-                    p.paragraph_format.space_after = Pt(10)
-                elif leading_spaces == 2:
-                    p = add_markdown_paragraph(doc, clean_text, bullet_prefix="- ")
-                    p.paragraph_format.left_indent = Pt(40)
-                elif leading_spaces >= 4:
-                    p = add_markdown_paragraph(doc, clean_text, bullet_prefix="- ")
-                    p.paragraph_format.left_indent = Pt(60)
-                else:
-                    # Default first-level bullet
-                    p = add_markdown_paragraph(doc, clean_text, bullet_prefix="- ")
-                    p.paragraph_format.left_indent = Pt(20)
+                # Process each line
+                for line in lines:
+                    leading_spaces = len(line) - len(line.lstrip(' '))
+                    
+                    clean_text = line.strip()
+                    has_bullet = clean_text.startswith("- ")
+                    if has_bullet:
+                        clean_text = clean_text[2:]  # Remove the "-" for parsing, we add it separately
 
-        doc.add_paragraph("Articles juridiques trouvés :")
-        for _, row in group.iterrows():
-            if row["flag_law"]==True:
-                law_text = f"• {row['label']}, description : {row['law_description']}"# ({row['law_type']}, {row['institution']}, {row['corpus']}, {row['location']}, {row['date'] if pd.notna(row['date']) else 'No Date'})"
-                para = doc.add_paragraph(law_text)
-                para.style.font.size = Pt(10)
+                    # Determine indentation and bullet prefix
+                    if leading_spaces == 0:
+                        # Top-level headline
+                        p = add_markdown_paragraph(doc, clean_text)  # no bullet
+                        p.paragraph_format.space_after = Pt(10)
+                    elif leading_spaces == 2:
+                        p = add_markdown_paragraph(doc, clean_text, bullet_prefix="- ")
+                        p.paragraph_format.left_indent = Pt(40)
+                    elif leading_spaces >= 4:
+                        p = add_markdown_paragraph(doc, clean_text, bullet_prefix="- ")
+                        p.paragraph_format.left_indent = Pt(60)
+                    else:
+                        # Default first-level bullet
+                        p = add_markdown_paragraph(doc, clean_text, bullet_prefix="- ")
+                        p.paragraph_format.left_indent = Pt(20)
 
-    # Save the document
-    # Example
-    path = Path(sumup_excel_path)
+            doc.add_paragraph("Articles juridiques trouvés :")
+            for _, row in group.iterrows():
+                if row["flag_law"]==True:
+                    law_text = f"• {row['label']}, description : {row['law_description']}"# ({row['law_type']}, {row['institution']}, {row['corpus']}, {row['location']}, {row['date'] if pd.notna(row['date']) else 'No Date'})"
+                    para = doc.add_paragraph(law_text)
+                    para.style.font.size = Pt(10)
 
-    output_path = f"{course_name}_sumup.docx"
+        # Save the document
+        # Example
+        path = Path(sumup_excel_path)
 
-    final_path = path.parent / output_path
+        output_path = f"{filename}_sumup.docx"
 
-    doc.save(final_path)
+        final_path = path.parent / output_path
 
-    print(f"Document saved to {final_path}")
+        doc.save(final_path)
+
+        print(f"Document saved to {final_path}")
