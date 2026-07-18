@@ -1,0 +1,10 @@
+typer
+pandas
+openpyxl
+python-docx
+tqdm
+openai
+langchain
+langchain-openai
+pydantic
+pymupdf

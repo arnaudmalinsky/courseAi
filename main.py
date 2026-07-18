@@ -6,6 +6,7 @@ from text_processing.parsers import CorpusParser
 from prompting.batch_llm_call import batch_call 
 from text_processing.edit_sumup import edit_sumup
 from text_processing.concatenate_texts import concatenate_text_from_excel
+from text_processing.pdf_to_docx import convert_pdf_to_docx
 
 
 app = typer.Typer()
@@ -87,6 +88,27 @@ def concatenate_excel_text(
     concatenate_text_from_excel(
         all_excel_file_path,
         course_name,
+    )
+
+
+@app.command()
+def pdf_to_docx(
+    input_pdf_path: str,
+    output_docx_path: str = None,
+    preserve_page_breaks: bool = False,
+    max_heading_chars: int = 140,
+    verbose: bool = True,
+):
+    lvl = logging.WARNING
+    fmt = "%(message)s"
+    if verbose is True:
+        lvl = logging.DEBUG
+    logging.basicConfig(level=lvl, format=fmt)
+    convert_pdf_to_docx(
+        input_pdf_path,
+        output_docx_path,
+        preserve_page_breaks,
+        max_heading_chars,
     )
     
 
