@@ -1,4 +1,5 @@
 import logging
+import os
 
 import typer
 
@@ -7,6 +8,11 @@ from prompting.batch_llm_call import batch_call
 from text_processing.edit_sumup import edit_sumup
 from text_processing.concatenate_texts import concatenate_text_from_excel
 from text_processing.pdf_to_docx import convert_pdf_to_docx
+from text_processing.chapter_pipeline import (
+    assemble_chapter_summaries,
+    split_docx_by_chapter,
+    summarize_chapter_manifest,
+)
 
 
 app = typer.Typer()
@@ -97,6 +103,8 @@ def pdf_to_docx(
     output_docx_path: str = None,
     preserve_page_breaks: bool = False,
     max_heading_chars: int = 140,
+    chapters_dir: str = None,
+    manifest_path: str = None,
     verbose: bool = True,
 ):
     lvl = logging.WARNING
@@ -109,7 +117,64 @@ def pdf_to_docx(
         output_docx_path,
         preserve_page_breaks,
         max_heading_chars,
+        chapters_dir,
+        manifest_path,
     )
+
+
+@app.command()
+def split_chapters(
+    source_docx_path: str,
+    output_dir: str,
+    manifest_path: str = None,
+):
+    split_docx_by_chapter(source_docx_path, output_dir, manifest_path)
+
+
+@app.command()
+def summarize_chapters(
+    manifest_path: str,
+    open_ai_key: str = None,
+    model: str = None,
+    concurrency: int = 4,
+    retries: int = 3,
+    retry_invalid: bool = False,
+    env_path: str = ".env",
+    chapter_id: list[str] = typer.Option(None, "--chapter-id"),
+    order: list[int] = typer.Option(None, "--order"),
+    from_order: int = typer.Option(None, "--from-order"),
+    to_order: int = typer.Option(None, "--to-order"),
+    force: bool = False,
+    verbose: bool = True,
+):
+    logging.basicConfig(
+        level=logging.INFO if verbose else logging.WARNING,
+        format="%(asctime)s | %(levelname)s | %(message)s",
+        datefmt="%H:%M:%S",
+    )
+    summarize_chapter_manifest(
+        manifest_path,
+        open_ai_key or os.getenv("OPENAI_API_KEY") or os.getenv("OPENAI_KEY"),
+        model,
+        concurrency,
+        retries,
+        retry_invalid,
+        env_path=env_path,
+        chapter_ids=chapter_id,
+        orders=order,
+        from_order=from_order,
+        to_order=to_order,
+        force=force,
+    )
+
+
+@app.command()
+def assemble_summaries(
+    manifest_path: str,
+    output_docx_path: str,
+    title: str = None,
+):
+    assemble_chapter_summaries(manifest_path, output_docx_path, title)
     
 
 if __name__ == "__main__":

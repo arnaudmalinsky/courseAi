@@ -19,6 +19,8 @@ def convert_pdf_to_docx(
     output_docx_path=None,
     preserve_page_breaks=False,
     max_heading_chars=140,
+    chapters_dir=None,
+    manifest_path=None,
 ):
     input_path = Path(input_pdf_path)
     output_path = Path(output_docx_path) if output_docx_path else input_path.with_suffix(".docx")
@@ -69,6 +71,12 @@ def convert_pdf_to_docx(
 
     doc.save(output_path)
     logging.warning("DOCX saved to %s", output_path)
+
+    if chapters_dir:
+        from .chapter_pipeline import split_docx_by_chapter
+
+        split_docx_by_chapter(output_path, chapters_dir, manifest_path)
+
     return output_path
 
 

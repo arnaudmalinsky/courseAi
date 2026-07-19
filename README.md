@@ -292,3 +292,126 @@ Le chemin passe en argument sert surtout a detecter un fichier existant et repre
 - Rendre les chemins de sortie LLM plus explicites.
 - Ajouter un petit dossier `examples/` avec un mini DOCX et les sorties attendues.
 - Ajouter des tests simples pour le parsing DOCX et la concatenation Excel.
+
+## Nouveau pipeline par chapitre
+
+Le pipeline historique reste disponible. Le nouveau mode permet de convertir un
+PDF, d'exporter un DOCX par chapitre, de résumer les chapitres en parallèle et
+d'assembler les résultats disponibles.
+
+### 1. Convertir et exporter les chapitres
+
+```powershell
+python main.py pdf-to-docx ".\data\cours.pdf" `
+  --output-docx-path ".\data\cours.docx" `
+  --chapters-dir ".\data\chapters"
+```
+
+Le dossier contient un fichier `chapters_manifest.xlsx`, un éventuel
+`000_preambule.docx`, puis un DOCX par titre commençant par `CHAPITRE`.
+Les lignes de table des matières comportant des pointillés et un numéro de page
+sont conservées pour la complétude, mais reçoivent le type
+`table_of_contents` et le statut `excluded` : elles ne sont ni envoyées au
+modèle ni assemblées, y compris avec `--force`.
+
+Le manifeste n'est déclaré complet qu'après réouverture des fichiers exportés.
+La concaténation de leurs paragraphes et tableaux doit reproduire exactement la
+séquence du DOCX complet. Un écart est enregistré comme avertissement, mais ne
+bloque pas les étapes suivantes.
+
+Les titres supérieurs aux chapitres sont conservés dans les colonnes `partie`
+et `theme`. Lorsqu'un nouveau titre supérieur apparaît entre deux chapitres, il
+est rattaché au chapitre qui suit.
+
+Un DOCX existant peut aussi être découpé sans reconvertir le PDF :
+
+```powershell
+python main.py split-chapters ".\data\cours.docx" ".\data\chapters"
+```
+
+### 2. Résumer les chapitres
+
+La commande lit automatiquement le fichier `.env`. Les variables reconnues
+sont :
+
+```dotenv
+OPENAI_KEY=...
+OPENAI_MODEL=gpt-5.6-terra
+MODEL_REASONNING=standard
+MODEL_VERBOSITY=low
+MODEL_SUMMARY=concise
+```
+
+`OPENAI_API_KEY` et `MODEL_REASONING` sont également acceptés. La valeur
+`standard` est convertie en `medium`, qui est la valeur correspondante acceptée
+par l'API Responses.
+
+```powershell
+python main.py summarize-chapters ".\data\chapters\chapters_manifest.xlsx" `
+  --concurrency 4
+```
+
+Chaque résultat est sauvegardé dans le manifeste dès qu'il est terminé. Une
+nouvelle exécution reprend les lignes `pending`, `processing`, `error` ou les
+anciens statuts `invalid`.
+
+Pour traiter uniquement certains chapitres :
+
+```powershell
+python main.py summarize-chapters ".\data\chapters\chapters_manifest.xlsx" `
+  --chapter-id chapter_001 `
+  --chapter-id chapter_005 `
+  --concurrency 2
+```
+
+La sélection peut aussi utiliser la colonne `order` :
+
+```powershell
+python main.py summarize-chapters ".\data\chapters\chapters_manifest.xlsx" `
+  --order 1 `
+  --order 2 `
+  --order 3
+```
+
+Pour sélectionner une plage inclusive d'un seul coup :
+
+```powershell
+python main.py summarize-chapters ".\data\chapters\chapters_manifest.xlsx" `
+  --from-order 1 `
+  --to-order 10 `
+  --concurrency 4
+```
+
+`--from-order 1 --to-order 10` traite les ordres 1 à 10 inclus. Utilisé seul,
+`--from-order 10` traite tous les ordres à partir de 10 et `--to-order 10`
+traite tous les ordres jusqu'à 10.
+
+Ajouter `--force` pour retraiter les chapitres sélectionnés même s'ils ont déjà
+le statut `complete`.
+
+Pendant le traitement, la CLI affiche le démarrage de chaque chapitre, la
+progression `traités/total`, le pourcentage, le statut, le temps écoulé et une
+estimation du temps restant. Le message de progression est écrit après la
+sauvegarde du résultat correspondant dans le manifeste. Utiliser `--no-verbose`
+pour ne conserver que les avertissements et erreurs.
+
+Les contrôles vérifient notamment l'intitulé, l'ordre et le niveau des titres,
+l'absence de catégories interdites et l'ajout de listes lorsqu'il n'en existe
+aucune dans la section source. Les anomalies sont enregistrées dans la colonne
+`validation` comme avertissements et ne bloquent ni la sauvegarde ni
+l'assemblage.
+
+### 3. Assembler le DOCX final
+
+```powershell
+python main.py assemble-summaries `
+  ".\data\chapters\chapters_manifest.xlsx" `
+  ".\data\fiche_finale.docx"
+```
+
+L'assemblage utilise toutes les lignes contenant un résumé, indépendamment du
+statut ou des avertissements de validation. Les lignes sans résumé sont
+ignorées. Une réduction cumulée inférieure à 50 % produit un avertissement sans
+bloquer le DOCX. `partie`, `theme` et les titres Markdown sont convertis
+respectivement en vrais styles Word `Heading 1`, `Heading 2` et niveaux
+inférieurs ; les concepts entre `**` sont mis en gras.
