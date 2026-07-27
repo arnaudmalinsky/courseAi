@@ -13,6 +13,7 @@ from text_processing.chapter_pipeline import (
     split_docx_by_chapter,
     summarize_chapter_manifest,
 )
+from text_processing.boxed_case_law_pipeline import extract_boxed_case_law_chapters
 
 
 app = typer.Typer()
@@ -175,6 +176,46 @@ def assemble_summaries(
     title: str = None,
 ):
     assemble_chapter_summaries(manifest_path, output_docx_path, title)
+
+
+@app.command()
+def extract_boxed_case_law(
+    chapters_dir: str,
+    example_image_path: str,
+    output_docx_path: str,
+    output_xlsx_path: str = None,
+    cache_dir: str = None,
+    open_ai_key: str = None,
+    model: str = None,
+    concurrency: int = 2,
+    retries: int = 3,
+    env_path: str = ".env",
+    force: bool = False,
+    from_chapter: int = None,
+    to_chapter: int = None,
+    verbose: bool = True,
+):
+    """Extrait visuellement les jurisprudences présentes dans les encadrés."""
+    logging.basicConfig(
+        level=logging.INFO if verbose else logging.WARNING,
+        format="%(asctime)s | %(levelname)s | %(message)s",
+        datefmt="%H:%M:%S",
+    )
+    extract_boxed_case_law_chapters(
+        chapters_dir=chapters_dir,
+        example_image_path=example_image_path,
+        output_docx_path=output_docx_path,
+        output_xlsx_path=output_xlsx_path,
+        cache_dir=cache_dir,
+        open_ai_key=open_ai_key,
+        model=model,
+        concurrency=concurrency,
+        retries=retries,
+        env_path=env_path,
+        force=force,
+        from_chapter=from_chapter,
+        to_chapter=to_chapter,
+    )
     
 
 if __name__ == "__main__":

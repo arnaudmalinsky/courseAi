@@ -410,7 +410,7 @@ def _extract_response_text(response_data):
     return "\n".join(texts)
 
 
-async def _call_openai_responses(settings, prompt):
+async def _call_openai_responses(settings, prompt, text_format=None):
     payload = {
         "model": settings["model"],
         "input": prompt,
@@ -422,8 +422,13 @@ async def _call_openai_responses(settings, prompt):
         reasoning["summary"] = settings["reasoning_summary"]
     if reasoning:
         payload["reasoning"] = reasoning
+    text_options = {}
     if settings.get("verbosity"):
-        payload["text"] = {"verbosity": settings["verbosity"]}
+        text_options["verbosity"] = settings["verbosity"]
+    if text_format:
+        text_options["format"] = text_format
+    if text_options:
+        payload["text"] = text_options
 
     timeout = httpx.Timeout(600.0, connect=30.0)
     async with httpx.AsyncClient(timeout=timeout) as client:

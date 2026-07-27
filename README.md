@@ -105,6 +105,35 @@ Options utiles :
 
 Ensuite, place le DOCX obtenu dans ton dossier de cours et lance l'extraction habituelle.
 
+#### Extraction visuelle des jurisprudences en encadré
+
+Lorsque le manuel est déjà découpé en un PDF par chapitre, cette commande envoie
+chaque chapitre complet au modèle avec l'image d'exemple. Elle ne crée aucun
+chevauchement entre chapitres. Chaque réponse structurée est sauvegardée après
+l'appel afin de permettre une reprise sans retraiter les chapitres terminés.
+
+```powershell
+conda activate courseai
+python main.py extract-boxed-case-law `
+  "C:\chemin\vers\PAC chapitres" `
+  "C:\chemin\vers\exemple_encadre.jpeg" `
+  ".\data\pac_jurisprudences\repertoire_jurisprudences_encadrees.docx" `
+  --cache-dir ".\data\pac_jurisprudences\chapters" `
+  --model gpt-5.5 `
+  --concurrency 2
+```
+
+La clé est lue depuis `OPENAI_KEY` ou `OPENAI_API_KEY` dans `.env`. Pour tester
+un seul chapitre, ajoute `--from-chapter 1 --to-chapter 1`. La commande reprend
+automatiquement les JSON présents dans `--cache-dir`; utilise `--force`
+uniquement pour refaire les appels déjà réussis.
+
+L'assemblage final produit simultanément le DOCX et un classeur Excel du même
+nom. Le classeur contient une feuille `Jurisprudences` avec une ligne par
+décision, la référence juridique et sa description synthétique dans deux
+colonnes distinctes, ainsi qu'une feuille `Synthèse` avec le nombre de décisions par chapitre.
+L'option `--output-xlsx-path` permet de choisir un autre emplacement.
+
 ### 2. Transformer des DOCX en Excel
 
 ```bash
